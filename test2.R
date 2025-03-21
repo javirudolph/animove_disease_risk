@@ -10,9 +10,7 @@ library(dplyr)
 
 set.seed(123) # For reproducibility
 
-#-----------------
-# 1. Create simulated landscape
-#-----------------
+# 1. Create simulated landscape -----------------
 
 # Create a simulated boundary (study area)
 create_study_area <- function(xmin = 0, xmax = 1000, ymin = 0, ymax = 1000) {
@@ -222,9 +220,8 @@ create_env_rasters <- function(study_area, n_layers = 3) {
    return(env_stack)
 }
 
-#-----------------
-# 2. Animal movement simulation
-#-----------------
+
+# 2. Animal movement simulation -----------------
 
 # Simulate movement using a correlated random walk
 simulate_animal_movement <- function(
@@ -371,15 +368,14 @@ create_animal_ud <- function(animal_tracks, env_rasters) {
    # plot(smoothed_kde)
 
    # Normalize to 0-1 scale
-   ud_rast <- (smoothed_kde - minmax(smoothed_kde)[1]) / (minmax(smoothed_kde)[2] - minmax(smoothed_kde)[1])
+   ud_rast <- (smoothed_kde - minmax(smoothed_kde)[1]) / (minmax(smoothed_kde)[2] - minmax(smoothed_kde)[1]) + 0.001
    names(ud_rast) <- "animal_ud"
 
    return(ud_rast)
 }
 
-#-----------------
-# 3. Midge distribution simulation
-#-----------------
+
+# 3. Midge distribution simulation -----------------
 
 # Simulate midge presence/absence data based on environmental variables
 simulate_midge_data <- function(env_rasters, n_samples = 500) {
@@ -478,11 +474,10 @@ fit_midge_sdm <- function(midge_data, env_rasters) {
    return(list(model = sdm_model, prediction = sdm_prediction))
 }
 
-#-----------------
-# 4. Combine animal use and midge risk to create risk maps
-#-----------------
 
-create_risk_map <- function(animal_ud, midge_sdm_prediction) {
+# 4. Combine animal use and midge risk to create risk maps -----------------
+
+create_risk_map <- function(animal_ud, midge_sdm_prediction, normalize = TRUE) {
 
    midge_sdm_prediction <- midge_sdm$prediction
    # Ensure rasters are aligned
@@ -497,19 +492,27 @@ create_risk_map <- function(animal_ud, midge_sdm_prediction) {
    risk_map <- animal_ud * midge_sdm_prediction
    names(risk_map) <- "disease_risk"
 
+   if(normalize) {
+      # Normalize to 0-1 scale
+      risk_map <- (risk_map - minmax(risk_map)[1]) / (minmax(risk_map)[2] - minmax(risk_map)[1]) + 0.001
+      names(risk_map) <- "disease_risk"
+   }
+
    return(risk_map)
 }
 
-#-----------------
-# 5. Run the simulation
-#-----------------
+
+# 5. Run the simulation -----------------
 
 # Create the simulated landscape
-set.seed(123)
+set.seed(508)
 study_area <- create_study_area()
 plot(study_area)
-water_bodies <- create_water_bodies(study_area)
-plot(water_bodies)
+water_bodies <- create_water_bodies(study_area, n_lakes = 3)
+# plot(water_bodies)
+ggplot() +
+   geom_sf(data = study_area) +
+   geom_sf(data = water_bodies)
 feeders <- create_feeders(study_area)
 plot(feeders)
 env_rasters <- create_env_rasters(study_area)
@@ -520,7 +523,7 @@ animal_tracks <- simulate_animal_movement(
    study_area = study_area,
    water_bodies = water_bodies,
    feeders = feeders,
-   n_animals = 10,
+   n_animals = 3,
    n_steps = 1000
 )
 
@@ -539,7 +542,6 @@ midge_sim <- simulate_midge_data(env_rasters)
 head(midge_sim)
 
 midge_data <- midge_sim$midge_data
-plot(midge_data)
 midge_data |>
    ggplot() +
    geom_sf(aes(color = factor(presence)))
@@ -553,9 +555,8 @@ plot(midge_prediction)
 risk_map <- create_risk_map(animal_ud, midge_prediction)
 plot(risk_map)
 
-#-----------------
-# 6. Plot results
-#-----------------
+
+# 6. Plot results -----------------
 
 # Convert rasters to data frames for plotting
 animal_ud_df <- as.data.frame(animal_ud, xy = TRUE)
@@ -579,41 +580,62 @@ animal_tracks |>
    geom_sf(data = feeders) +
    geom_sf(data = water_bodies)
 
+# Plot study area
+ggplot() +
+   geom_sf(data = study_area, fill = "NA", color = "black", linewidth = 1) +
+   geom_sf(data = feeders, aes(color = "Feeders")) +
+   geom_sf(data = water_bodies, aes(fill = "Water\nBodies"), alpha = 0.5) +
+   scale_color_manual(values = "red") +
+   scale_fill_manual(values = "grey80") +
+   theme_void() +
+   labs(title = "Study Area",
+        x = "Easting", y = "Northing") +
+   theme(legend.title = element_blank()) -> plot_study_area
+
 # Plot utilization distribution
 ggplot() +
    geom_sf(data = study_area) +
    tidyterra::geom_spatraster(data = animal_ud) +
-   scale_fill_distiller(palette = "BrBG") +
-   geom_sf(data = feeders, color = "darkred") +
-   geom_sf(data = water_bodies, fill = "blue", alpha = 0.5) +
-   theme_minimal() +
-   labs(title = "Animal utilization distribution")
+   scale_fill_viridis_c(name = "Utlization\nDistribution", option = "plasma") +
+   # geom_sf(data = feeders, color = "white") +
+   # geom_sf(data = water_bodies, fill = "grey80", alpha = 0.5) +
+   theme_void() +
+   labs(title = "Animal Utilization Distribution",
+        x = "Easting", y = "Northing") -> plot_animal_ud
 
 # Plot midge distribution model
 ggplot() +
    geom_sf(data = study_area) +
    tidyterra::geom_spatraster(data = midge_prediction) +
    scale_fill_distiller(palette = "BrBG") +
-   geom_sf(data = feeders, color = "darkred") +
-   geom_sf(data = water_bodies, fill = "blue", alpha = 0.5) +
+   # geom_sf(data = feeders, color = "white") +
+   # geom_sf(data = water_bodies, fill = "grey80", alpha = 0.5) +
    theme_minimal() +
    # labs(title = "Midge probability of occurrence")
    scale_fill_viridis_c(name = "Midge\nProbability", option = "plasma") +
    scale_shape_manual(values = c(4, 16), name = "Midge Presence") +
-   theme_minimal() +
+   theme_void() +
    labs(title = "Midge Species Distribution Model",
-        x = "Easting", y = "Northing")
+        x = "Easting", y = "Northing") -> plot_midge_prob
 
 # Plot final risk map
 ggplot() +
    geom_sf(data = study_area) +
    tidyterra::geom_spatraster(data = risk_map) +
    scale_fill_distiller(palette = "BrBG") +
-   geom_sf(data = feeders, color = "darkred") +
-   geom_sf(data = water_bodies, fill = "blue", alpha = 0.5) +
+   # geom_sf(data = feeders, color = "white") +
+   # geom_sf(data = water_bodies, fill = "grey80", alpha = 0.5) +
    scale_fill_viridis_c(name = "Disease Risk", option = "magma") +
-   theme_minimal() +
-   labs(title = "Combined Disease Risk Map",
+   theme_void() +
+   labs(title = "Normalized Disease Risk Map",
         subtitle = "Animal Use × Midge Probability",
-        x = "Easting", y = "Northing")
+        x = "Easting", y = "Northing") -> plot_disease_risk
 
+
+cowplot::plot_grid(
+   plot_study_area,
+   plot_animal_ud,
+   plot_midge_prob,
+   plot_disease_risk,
+   ncol = 2
+)
