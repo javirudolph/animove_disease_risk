@@ -1,5 +1,5 @@
-# Disease Risk Simulation Dashboard App
-# Using shinydashboard theme with the corrected function calls
+# Enhanced Disease Risk Simulation Dashboard App
+# Including environmental rasters and distribution visualizations
 
 # Load required packages
 library(shiny)
@@ -22,7 +22,11 @@ ui <- dashboardPage(
    dashboardSidebar(
       sidebarMenu(
          menuItem("Simulation Parameters", tabName = "params", icon = icon("sliders")),
-         menuItem("Simulation Results", tabName = "results", icon = icon("map")),
+         menuItem("Landscape", tabName = "landscape", icon = icon("map")),
+         menuItem("Environment", tabName = "environment", icon = icon("tree")),
+         menuItem("Animal Data", tabName = "animals", icon = icon("paw")),
+         menuItem("Midge Data", tabName = "midges", icon = icon("bug")),
+         menuItem("Risk Assessment", tabName = "risk", icon = icon("exclamation-triangle")),
          menuItem("About", tabName = "about", icon = icon("info-circle"))
       )
    ),
@@ -63,20 +67,108 @@ ui <- dashboardPage(
                  )
          ),
 
-         # Results tab
-         tabItem(tabName = "results",
+         # Landscape tab
+         tabItem(tabName = "landscape",
                  fluidRow(
-                    tabBox(
-                       title = "Simulation Results", width = 12,
-                       tabPanel("Landscape",
-                                withSpinner(plotOutput("landscape_plot", height = "600px")),
-                                downloadButton("download_landscape", "Download Plot")),
-                       tabPanel("Animal Movement",
-                                withSpinner(plotOutput("movement_plot", height = "600px")),
-                                downloadButton("download_movement", "Download Plot")),
-                       tabPanel("Risk Map",
-                                withSpinner(plotOutput("risk_plot", height = "600px")),
-                                downloadButton("download_risk", "Download Plot"))
+                    box(
+                       title = "Simulated Landscape", width = 12, status = "primary",
+                       withSpinner(plotOutput("landscape_plot", height = "600px")),
+                       downloadButton("download_landscape", "Download Plot")
+                    )
+                 )
+         ),
+
+         # Environment tab
+         tabItem(tabName = "environment",
+                 fluidRow(
+                    box(
+                       title = "Environmental Variables", width = 12, status = "primary",
+                       selectInput("env_layer", "Select Environmental Layer:",
+                                   choices = c("Elevation" = "elevation",
+                                               "Water Distance" = "water_dist",
+                                               "Vegetation Index" = "veg_index",
+                                               "Temperature" = "temperature"),
+                                   selected = "elevation"),
+                       withSpinner(plotOutput("env_plot", height = "600px")),
+                       downloadButton("download_env", "Download Plot")
+                    )
+                 ),
+                 fluidRow(
+                    box(
+                       title = "Environmental Variables Description", width = 12, status = "info",
+                       HTML("<ul>
+                         <li><strong>Elevation:</strong> Simulated terrain elevation across the study area.</li>
+                         <li><strong>Water Distance:</strong> Distance from each point to the nearest water body.</li>
+                         <li><strong>Vegetation Index:</strong> Simulated vegetation density (similar to NDVI).</li>
+                         <li><strong>Temperature:</strong> Simulated temperature patterns across the landscape.</li>
+                       </ul>")
+                    )
+                 )
+         ),
+
+         # Animal Data tab
+         tabItem(tabName = "animals",
+                 fluidRow(
+                    box(
+                       title = "Animal Movement Tracks", width = 6, status = "primary",
+                       withSpinner(plotOutput("movement_plot", height = "400px")),
+                       downloadButton("download_movement", "Download Plot")
+                    ),
+                    box(
+                       title = "Animal Utilization Distribution", width = 6, status = "primary",
+                       withSpinner(plotOutput("ud_plot", height = "400px")),
+                       downloadButton("download_ud", "Download Plot")
+                    )
+                 ),
+                 fluidRow(
+                    box(
+                       title = "Animal Data Interpretation", width = 12, status = "info",
+                       HTML("<p>The left plot shows the movement tracks of individual animals in the simulation. Each color represents a different animal.</p>
+                       <p>The right plot displays the animal utilization distribution, which shows the probability of finding animals in different areas of the landscape.
+                          Warmer colors (red, orange) indicate areas with higher animal activity.</p>")
+                    )
+                 )
+         ),
+
+         # Midge Data tab
+         tabItem(tabName = "midges",
+                 fluidRow(
+                    box(
+                       title = "Midge Sample Points", width = 6, status = "primary",
+                       withSpinner(plotOutput("midge_sample_plot", height = "400px")),
+                       downloadButton("download_midge_sample", "Download Plot")
+                    ),
+                    box(
+                       title = "Predicted Midge Distribution", width = 6, status = "primary",
+                       withSpinner(plotOutput("midge_prediction_plot", height = "400px")),
+                       downloadButton("download_midge_prediction", "Download Plot")
+                    )
+                 ),
+                 fluidRow(
+                    box(
+                       title = "Midge Data Interpretation", width = 12, status = "info",
+                       HTML("<p>The left plot shows the midge sampling points used to build the distribution model. Points are colored by presence (1) or absence (0) of midges.</p>
+                       <p>The right plot displays the predicted probability of midge presence across the landscape based on environmental variables.
+                          Blues indicate higher probability of midge presence.</p>")
+                    )
+                 )
+         ),
+
+         # Risk tab
+         tabItem(tabName = "risk",
+                 fluidRow(
+                    box(
+                       title = "Disease Risk Map", width = 12, status = "warning",
+                       withSpinner(plotOutput("risk_plot", height = "600px")),
+                       downloadButton("download_risk", "Download Plot")
+                    )
+                 ),
+                 fluidRow(
+                    box(
+                       title = "Risk Interpretation", width = 12, status = "info",
+                       HTML("<p>The disease risk map combines animal utilization distribution and midge distribution to identify areas of potential disease transmission.</p>
+                       <p>Areas with both high animal activity and high midge presence represent higher risk for disease transmission (shown in red).</p>
+                       <p>This information can be used to target surveillance and control efforts in high-risk areas.</p>")
                     )
                  )
          ),
@@ -89,6 +181,7 @@ ui <- dashboardPage(
                      <p>The simulation follows these steps:</p>
                      <ol>
                        <li>Create a simulated landscape with water bodies and feeding stations</li>
+                       <li>Generate environmental layers (elevation, water distance, vegetation, temperature)</li>
                        <li>Simulate animal movement within the landscape</li>
                        <li>Generate animal utilization distribution (where animals spend their time)</li>
                        <li>Simulate midge distribution based on environmental factors</li>
@@ -112,6 +205,8 @@ server <- function(input, output, session) {
       env_rasters = NULL,
       animal_tracks = NULL,
       animal_ud = NULL,
+      midge_data = NULL,
+      midge_sample = NULL,
       midge_prediction = NULL,
       risk_map = NULL
    )
@@ -202,6 +297,33 @@ server <- function(input, output, session) {
          theme_minimal()
    })
 
+   # Environmental raster plot
+   output$env_plot <- renderPlot({
+      req(sim_results$env_rasters, input$env_layer)
+
+      selected_raster <- sim_results$env_rasters[[input$env_layer]]
+
+      # Create a nicer title based on selection
+      titles <- list(
+         elevation = "Elevation (m)",
+         water_dist = "Distance to Water Bodies (m)",
+         veg_index = "Vegetation Index",
+         temperature = "Temperature (°C)"
+      )
+
+      # Color schemes for different variables
+      color_schemes <- list(
+         elevation = terrain.colors(100),
+         water_dist = colorRampPalette(c("darkblue", "lightblue", "white"))(100),
+         veg_index = colorRampPalette(c("brown", "yellow", "darkgreen"))(100),
+         temperature = heat.colors(100)
+      )
+
+      plot(selected_raster,
+           main = titles[[input$env_layer]],
+           col = color_schemes[[input$env_layer]])
+   })
+
    # Animal movement plot
    output$movement_plot <- renderPlot({
       req(sim_results$animal_tracks)
@@ -217,11 +339,47 @@ server <- function(input, output, session) {
          theme_minimal()
    })
 
+   # Animal utilization distribution plot
+   output$ud_plot <- renderPlot({
+      req(sim_results$animal_ud)
+
+      plot(sim_results$animal_ud,
+           main = "Animal Utilization Distribution",
+           col = colorRampPalette(c("white", "yellow", "orange", "red"))(100))
+   })
+
+   # Midge sample points plot
+   output$midge_sample_plot <- renderPlot({
+      req(sim_results$midge_sample)
+
+      ggplot() +
+         geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
+         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
+         geom_sf(data = sim_results$midge_sample, aes(color = factor(presence)), size = 2) +
+         scale_color_manual(values = c("0" = "gray", "1" = "darkblue"),
+                            name = "Midge Presence",
+                            labels = c("0" = "Absent", "1" = "Present")) +
+         labs(title = "Midge Sampling Points",
+              subtitle = "GRTS sampling design with presence/absence data") +
+         theme_minimal()
+   })
+
+   # Midge prediction plot
+   output$midge_prediction_plot <- renderPlot({
+      req(sim_results$midge_prediction)
+
+      plot(sim_results$midge_prediction,
+           main = "Predicted Midge Distribution",
+           col = colorRampPalette(c("white", "lightblue", "blue", "darkblue"))(100))
+   })
+
    # Risk map plot
    output$risk_plot <- renderPlot({
       req(sim_results$risk_map)
 
-      terra::plot(sim_results$risk_map, main = "Disease Risk Map", col = hcl.colors(50, "Spectral", rev = TRUE))
+      plot(sim_results$risk_map,
+           main = "Disease Risk Map",
+           col = colorRampPalette(c("blue", "green", "yellow", "orange", "red"))(100))
    })
 
    # Download handlers for plots
@@ -239,6 +397,35 @@ server <- function(input, output, session) {
                     subtitle = paste(input$water_bodies, "water bodies and", input$n_feeders, "feeders")) +
                theme_minimal()
          }, width = 10, height = 8, dpi = 300)
+      }
+   )
+
+   output$download_env <- downloadHandler(
+      filename = function() {
+         paste("environment-", input$env_layer, "-", Sys.Date(), ".png", sep = "")
+      },
+      content = function(file) {
+         png(file, width = 3000, height = 2400, res = 300)
+         selected_raster <- sim_results$env_rasters[[input$env_layer]]
+
+         titles <- list(
+            elevation = "Elevation (m)",
+            water_dist = "Distance to Water Bodies (m)",
+            veg_index = "Vegetation Index",
+            temperature = "Temperature (°C)"
+         )
+
+         color_schemes <- list(
+            elevation = terrain.colors(100),
+            water_dist = colorRampPalette(c("darkblue", "lightblue", "white"))(100),
+            veg_index = colorRampPalette(c("brown", "yellow", "darkgreen"))(100),
+            temperature = heat.colors(100)
+         )
+
+         plot(selected_raster,
+              main = titles[[input$env_layer]],
+              col = color_schemes[[input$env_layer]])
+         dev.off()
       }
    )
 
@@ -261,13 +448,61 @@ server <- function(input, output, session) {
       }
    )
 
+   output$download_ud <- downloadHandler(
+      filename = function() {
+         paste("animal-utilization-", Sys.Date(), ".png", sep = "")
+      },
+      content = function(file) {
+         png(file, width = 3000, height = 2400, res = 300)
+         plot(sim_results$animal_ud,
+              main = "Animal Utilization Distribution",
+              col = colorRampPalette(c("white", "yellow", "orange", "red"))(100))
+         dev.off()
+      }
+   )
+
+   output$download_midge_sample <- downloadHandler(
+      filename = function() {
+         paste("midge-samples-", Sys.Date(), ".png", sep = "")
+      },
+      content = function(file) {
+         ggsave(file, plot = {
+            ggplot() +
+               geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
+               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
+               geom_sf(data = sim_results$midge_sample, aes(color = factor(presence)), size = 2) +
+               scale_color_manual(values = c("0" = "gray", "1" = "darkblue"),
+                                  name = "Midge Presence",
+                                  labels = c("0" = "Absent", "1" = "Present")) +
+               labs(title = "Midge Sampling Points",
+                    subtitle = "GRTS sampling design with presence/absence data") +
+               theme_minimal()
+         }, width = 10, height = 8, dpi = 300)
+      }
+   )
+
+   output$download_midge_prediction <- downloadHandler(
+      filename = function() {
+         paste("midge-prediction-", Sys.Date(), ".png", sep = "")
+      },
+      content = function(file) {
+         png(file, width = 3000, height = 2400, res = 300)
+         plot(sim_results$midge_prediction,
+              main = "Predicted Midge Distribution",
+              col = colorRampPalette(c("white", "lightblue", "blue", "darkblue"))(100))
+         dev.off()
+      }
+   )
+
    output$download_risk <- downloadHandler(
       filename = function() {
          paste("risk-map-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
          png(file, width = 3000, height = 2400, res = 300)
-         terra::plot(sim_results$risk_map, main = "Disease Risk Map", col = hcl.colors(50, "Spectral", rev = TRUE))
+         plot(sim_results$risk_map,
+              main = "Disease Risk Map",
+              col = colorRampPalette(c("blue", "green", "yellow", "orange", "red"))(100))
          dev.off()
       }
    )
