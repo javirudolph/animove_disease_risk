@@ -62,20 +62,31 @@ animal_tracks |>
 animal_ud <- create_animal_ud(animal_tracks, study_area, resolution = 10, smoothing_factor = 9)
 plot(animal_ud)
 
+ggplot() +
+   geom_sf(data = study_area) +
+   tidyterra::geom_spatraster(data = animal_ud) +
+   scale_fill_viridis_c(name = "Utlization\nDistribution", option = "plasma") +
+   # geom_sf(data = feeders, color = "white") +
+   # geom_sf(data = water_bodies, fill = "grey80", alpha = 0.5) +
+   theme_void() +
+   labs(title = "Animal Utilization Distribution")
+
 # Simulate midge data
-midge_sim <- simulate_midge_data(env_rasters)
+midge_sim <- simulate_midge_data(env_rasters, water_bodies)
 head(midge_sim)
 
 midge_data <- midge_sim$midge_data
 midge_data |>
    ggplot() +
-   geom_sf(aes(color = factor(presence)))
+   geom_sf(aes(color = factor(presence))) +
+   geom_sf(data = water_bodies, fill = NA, color = "blue")
 
 # Get a sample of 20-100 traps with the data for the sdm
 midge_data_sample <- slice_sample(midge_data, n = 20)
 midge_data_sample |>
    ggplot() +
-   geom_sf(aes(color = factor(presence)))
+   geom_sf(aes(color = factor(presence))) +
+   geom_sf(data = water_bodies, fill = NA, color = "blue")
 
 # Use a more complex sampling: GRTS
 library(spsurvey)
@@ -91,7 +102,8 @@ midge_data_grts <- grts_sample$sites_base |>
 
 midge_data_grts|>
    ggplot() +
-   geom_sf(aes(color = factor(presence)))
+   geom_sf(aes(color = factor(presence))) +
+   geom_sf(data = water_bodies, fill = NA, color = "blue")
 
 # Fit midge distribution model
 # midge_sdm <- fit_midge_sdm(midge_data_sample, env_rasters)
@@ -99,8 +111,38 @@ midge_sdm <- fit_midge_sdm(midge_data_grts, env_rasters)
 midge_prediction <- midge_sdm$prediction
 plot(midge_prediction)
 
+# Plot midge distribution model
+ggplot() +
+   geom_sf(data = study_area) +
+   tidyterra::geom_spatraster(data = midge_prediction) +
+   geom_sf(data = water_bodies, alpha = 0.5) +
+   scale_fill_distiller(palette = "BrBG") +
+   # geom_sf(data = feeders, color = "white") +
+   # geom_sf(data = water_bodies, fill = "grey80", alpha = 0.5) +
+   theme_minimal() +
+   # labs(title = "Midge probability of occurrence")
+   # scale_fill_viridis_c(name = "Midge\nProbability", option = "plasma") +
+   scale_shape_manual(values = c(4, 16), name = "Midge Presence") +
+   theme_void() +
+   labs(title = "Midge Species Distribution Model",
+        x = "Easting", y = "Northing")
+
 # Create final risk map
 risk_map <- create_risk_map(animal_ud, midge_prediction)
 plot(risk_map)
 
+# Plot final risk map
+ggplot() +
+   geom_sf(data = study_area) +
+   tidyterra::geom_spatraster(data = risk_map) +
+   geom_sf(data = water_bodies, alpha = 0.5) +
+   geom_sf(data = feeders, color = "red") +
+   scale_fill_distiller(palette = "BrBG") +
+   # geom_sf(data = feeders, color = "white") +
+   # geom_sf(data = water_bodies, fill = "grey80", alpha = 0.5) +
+   # scale_fill_viridis_c(name = "Disease Risk", option = "magma") +
+   theme_void() +
+   labs(title = "Normalized Disease Risk Map",
+        subtitle = "Animal Use × Midge Probability",
+        x = "Easting", y = "Northing")
 
