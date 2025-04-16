@@ -388,7 +388,7 @@ server <- function(input, output, session) {
 
       ggplot() +
          geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
-         geom_sf(data = sim_results$water_bodies, color ="#81C3D7", fill ="#81C3D7") +
+         geom_sf(data = sim_results$water_bodies, color ="#81C3D7", fill ="#81C3D7", alpha = 0.6) +
          # Add labels for feeder IDs
          geom_sf_label(data = sim_results$feeders,
                        aes(label = id),
@@ -416,14 +416,14 @@ server <- function(input, output, session) {
          # Add the raster layer with geom_spatraster from tidyterra
          geom_spatraster(data = sim_results$animal_ud) +
          geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
-         geom_sf(data = sim_results$water_bodies, color ="#81C3D7", fill ="#81C3D7") +
+         geom_sf(data = sim_results$water_bodies, color ="#81C3D7", fill ="#81C3D7", alpha = 0.6) +
          # Add labels for feeder IDs
          geom_sf_label(data = sim_results$feeders,
                        aes(label = id),
                        color = "white",
                        fill = "#D95F02",
                        size = 3,
-                       fontface = "bold")
+                       fontface = "bold") +
          scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100),
                               name = "Density") +
          labs(title = "Animal Utilization Distribution") +
