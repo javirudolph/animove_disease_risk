@@ -703,6 +703,98 @@ create_risk_map <- function(animal_ud, midge_sdm_prediction, normalize = TRUE) {
    return(risk_map)
 }
 
+# want to calculate specific risk for each feeder
+calculate_feeder_risk <- function(
+      risk_surface,       # Risk surface raster (output from create_risk_map)
+      feeders,            # SF object containing feeder locations
+      buffer_radius = 0,  # Optional buffer radius around feeders (in map units)
+      metrics = c("point", "mean", "max", "quantile"), # Risk metrics to calculate
+      quantile_probs = c(0.5, 0.75, 0.9)  # Quantiles to calculate if "quantile" in metrics
+) {
+   # Ensure feeders is an sf object
+   if (!inherits(feeders, "sf")) {
+      stop("feeders must be an sf object")
+   }
+
+   # Ensure CRS match
+   if (sf::st_crs(feeders) != terra::crs(risk_surface)) {
+      feeders <- sf::st_transform(feeders, terra::crs(risk_surface))
+   }
+
+   # Initialize results dataframe with feeder coordinates
+   feeder_coords <- sf::st_coordinates(feeders)
+   results <- data.frame(
+      feeder_id = seq_len(nrow(feeders)),
+      x = feeder_coords[, 1],
+      y = feeder_coords[, 2]
+   )
+
+   # Add any attributes from the original feeders object
+   if (ncol(sf::st_drop_geometry(feeders)) > 0) {
+      results <- cbind(results, sf::st_drop_geometry(feeders))
+   }
+
+   # Extract point risk values at feeder locations
+   if ("point" %in% metrics) {
+      point_values <- terra::extract(risk_surface, feeder_coords)
+      results$risk_point <- point_values$disease_risk
+   }
+
+   # If buffer radius > 0, calculate additional metrics within buffer
+   if (buffer_radius > 0) {
+      # Create buffered areas around feeders
+      feeder_buffers <- sf::st_buffer(feeders, dist = buffer_radius)
+
+      # Loop through each feeder to calculate metrics within its buffer
+      for (i in 1:nrow(feeders)) {
+         # Extract single buffer
+         buffer <- feeder_buffers[i, ]
+
+         # Crop and mask risk surface to buffer
+         buffer_risk <- terra::crop(risk_surface, terra::ext(buffer))
+         buffer_risk <- terra::mask(buffer_risk, terra::vect(buffer))
+
+         # Extract values within buffer
+         buffer_values <- terra::values(buffer_risk)
+         buffer_values <- buffer_values[!is.na(buffer_values)]
+
+         # Skip calculations if no valid values in buffer
+         if (length(buffer_values) == 0) {
+            if ("mean" %in% metrics) results$risk_mean[i] <- NA
+            if ("max" %in% metrics) results$risk_max[i] <- NA
+            if ("quantile" %in% metrics) {
+               for (prob in quantile_probs) {
+                  col_name <- paste0("risk_q", prob * 100)
+                  results[[col_name]][i] <- NA
+               }
+            }
+            next
+         }
+
+         # Calculate requested metrics
+         if ("mean" %in% metrics) {
+            results$risk_mean[i] <- mean(buffer_values, na.rm = TRUE)
+         }
+
+         if ("max" %in% metrics) {
+            results$risk_max[i] <- max(buffer_values, na.rm = TRUE)
+         }
+
+         if ("quantile" %in% metrics) {
+            quant_values <- stats::quantile(buffer_values, probs = quantile_probs, na.rm = TRUE)
+            for (j in 1:length(quantile_probs)) {
+               col_name <- paste0("risk_q", quantile_probs[j] * 100)
+               results[[col_name]][i] <- quant_values[j]
+            }
+         }
+      }
+   }
+
+   return(results)
+}
+
+
+
 ## Accessory functions
 # Helper function to scale values to 0-1
 scale01 <- function(x) {

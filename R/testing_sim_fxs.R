@@ -146,3 +146,25 @@ ggplot() +
         subtitle = "Animal Use × Midge Probability",
         x = "Easting", y = "Northing")
 
+
+# Calculate the risk for each feeder
+# - risk_map: output from create_risk_map()
+# - feeders_sf: an sf object with feeder locations
+
+# Calculate basic point risk
+feeder_risks <- calculate_feeder_risk(
+   risk_surface = risk_map,
+   feeders = feeders
+)
+feeder_risks |> arrange(desc(risk_point))
+
+# Calculate more comprehensive metrics with a 100m buffer
+feeder_risks_detailed <- calculate_feeder_risk(
+   risk_surface = risk_map,
+   feeders = feeders,
+   buffer_radius = 30,
+   metrics = c("point", "mean", "max", "quantile"),
+   quantile_probs = c(0.5, 0.75, 0.9, 0.95)
+)
+
+feeder_risks_detailed

@@ -213,139 +213,90 @@ server <- function(input, output, session) {
       midge_sample = NULL,
       midge_prediction = NULL,
       risk_map = NULL,
-      feeder_risk = NULL,
-      error_message = NULL
+      feeder_risk = NULL
    )
-
-   # Function to calculate risk manually if the create_risk_map function fails
-   calculate_risk_manually <- function(animal_ud, midge_prediction) {
-      # Make sure the extents match
-      animal_ud <- terra::resample(animal_ud, midge_prediction)
-
-      # Multiply the two probabilities
-      risk_map <- animal_ud * midge_prediction
-
-      # Normalize to 0-1 range if needed
-      risk_values <- terra::values(risk_map)
-      if (max(risk_values, na.rm = TRUE) > 0) {
-         risk_map <- risk_map / max(risk_values, na.rm = TRUE)
-      }
-
-      return(risk_map)
-   }
 
    # Run simulation when button is clicked
    observeEvent(input$run_simulation, {
 
-      # Disable run button during simulation
-      disable("run_simulation")
-      sim_results$error_message <- NULL
+      withProgress(message = 'Running simulation...', value = 0, {
 
-      # Try-catch to handle any errors during simulation
-      tryCatch({
+         # Step 1: Create study area
+         incProgress(0.1, detail = "Creating landscape")
+         sim_results$study_area <- create_study_area(xmax = input$study_area_width, ymax = input$study_area_height)
 
-         # Show progress notification
-         withProgress(message = 'Running simulation...', value = 0, {
+         # Step 2: Create water bodies
+         incProgress(0.1, detail = "Adding water bodies")
+         sim_results$water_bodies <- create_water_bodies(sim_results$study_area, n = input$water_bodies)
 
-            # Step 1: Create study area
-            incProgress(0.1, detail = "Creating landscape")
-            sim_results$study_area <- create_study_area()
+         # Step 3: Create feeders
+         incProgress(0.1, detail = "Adding feeders")
+         sim_results$feeders <- create_feeders(
+            sim_results$study_area,
+            n = input$n_feeders,
+            water_bodies = sim_results$water_bodies,
+            buffer_dist = input$buffer_feeders
+         )
 
-            # Step 2: Create water bodies
-            incProgress(0.1, detail = "Adding water bodies")
-            sim_results$water_bodies <- create_water_bodies(sim_results$study_area, n = input$water_bodies)
+         # Step 4: Create environmental rasters
+         incProgress(0.1, detail = "Generating environmental layers")
+         sim_results$env_rasters <- create_env_rasters(sim_results$study_area, sim_results$water_bodies)
 
-            # Step 3: Create feeders - with corrected parameters
-            incProgress(0.1, detail = "Adding feeders")
-            sim_results$feeders <- create_feeders(
-               sim_results$study_area,
-               input$n_feeders,
-               sim_results$water_bodies
-            )
+         # Step 5: Simulate animal movement
+         incProgress(0.2, detail = "Simulating animal movement")
+         sim_results$animal_tracks <- simulate_animal_movement(
+            study_area = sim_results$study_area,
+            water_bodies = sim_results$water_bodies,
+            feeders = sim_results$feeders,
+            n_animals = input$n_animals,
+            n_steps = input$n_steps
+         )
 
-            # Step 4: Create environmental rasters
-            incProgress(0.1, detail = "Generating environmental layers")
-            sim_results$env_rasters <- create_env_rasters(sim_results$study_area, sim_results$water_bodies)
+         # Step 6: Create animal utilization distribution
+         incProgress(0.1, detail = "Calculating animal utilization")
+         sim_results$animal_ud <- create_animal_ud(
+            sim_results$animal_tracks,
+            sim_results$study_area,
+            resolution = input$resolution,
+            smoothing_factor = input$smoothing_factor
+         )
 
-            # Step 5: Simulate animal movement
-            incProgress(0.2, detail = "Simulating animal movement")
-            sim_results$animal_tracks <- simulate_animal_movement(
-               study_area = sim_results$study_area,
-               water_bodies = sim_results$water_bodies,
-               feeders = sim_results$feeders,
-               n_animals = input$n_animals,
-               n_steps = input$n_steps
-            )
+         # Step 7: Simulate midge data
+         incProgress(0.1, detail = "Simulating midge distribution")
+         midge_sim <- simulate_midge_data(sim_results$env_rasters, sim_results$water_bodies)
+         sim_results$midge_data <- midge_sim$midge_data
 
-            # Step 6: Create animal utilization distribution
-            incProgress(0.1, detail = "Calculating animal utilization")
-            sim_results$animal_ud <- create_animal_ud(
-               sim_results$animal_tracks,
-               sim_results$study_area,
-               resolution = 10,
-               smoothing_factor = 9
-            )
-
-            # Step 7: Simulate midge data
-            incProgress(0.1, detail = "Simulating midge distribution")
-            midge_sim <- simulate_midge_data(sim_results$env_rasters)
-            sim_results$midge_data <- midge_sim$midge_data
-
-            # Step 8: Get midge samples
-            incProgress(0.1, detail = "Sampling midges")
-            grts_sample <- spsurvey::grts(sim_results$midge_data, 100)
+         # Step 8: Get midge samples
+         incProgress(0.1, detail = "Sampling midges")
+         if (input$sampling_method == "random") {
+            sim_results$midge_sample <- dplyr::slice_sample(sim_results$midge_data, n = input$n_samples)
+         } else { # GRTS
+            grts_sample <- spsurvey::grts(sim_results$midge_data, input$n_samples)
             sim_results$midge_sample <- grts_sample$sites_base %>%
                dplyr::select(presence, elevation, water_dist, veg_index, temperature, geometry)
+         }
 
-            # Step 9: Fit midge distribution model
-            incProgress(0.1, detail = "Modeling midge distribution")
-            midge_sdm_result <- fit_midge_sdm(sim_results$midge_sample, sim_results$env_rasters)
-            sim_results$midge_prediction <- midge_sdm_result$prediction
+         # Step 9: Fit midge distribution model
+         incProgress(0.1, detail = "Modeling midge distribution")
+         midge_sdm <- fit_midge_sdm(sim_results$midge_sample, sim_results$env_rasters)
+         sim_results$midge_prediction <- midge_sdm$prediction
 
-            # Store the entire midge_sdm object if needed for create_risk_map
-            sim_results$midge_sdm <- midge_sdm_result
+         # Step 10: Create risk map
+         incProgress(0.1, detail = "Creating risk map")
+         sim_results$risk_map <- create_risk_map(sim_results$animal_ud, sim_results$midge_prediction)
 
-            # Step 10: Create risk map - try the original function first
-            incProgress(0.1, detail = "Creating risk map")
-            tryCatch({
-               # Try using the create_risk_map function
-               sim_results$risk_map <- create_risk_map(sim_results$animal_ud, sim_results$midge_prediction)
-            }, error = function(e) {
-               # If there's an error, use our manual calculation function
-               message("Using manual risk calculation as fallback")
-               sim_results$risk_map <- calculate_risk_manually(sim_results$animal_ud, sim_results$midge_prediction)
-            })
+         # Step 11: Calculate feeder risk
+         incProgress(0.1, detail = "Calculating feeder risk")
+         sim_results$feeder_risk <- calculate_feeder_risk(
+            risk_surface = sim_results$risk_map,
+            feeders = sim_results$feeders,
+            buffer_radius = 30,
+            metrics = c("point", "mean", "max", "quantile"),
+            quantile_probs = c(0.5, 0.75, 0.9, 0.95)
+         )
 
-            # Step 11: Calculate risk metrics for feeders
-            if (!is.null(sim_results$risk_map)) {
-               # Extract risk values at feeder locations
-               feeder_coords <- st_coordinates(sim_results$feeders)
-               feeder_risk_values <- terra::extract(sim_results$risk_map, feeder_coords)[, 2]
-
-               # Create feeder risk data.frame
-               sim_results$feeder_risk <- data.frame(
-                  feeder_id = 1:nrow(sim_results$feeders),
-                  risk_value = feeder_risk_values,
-                  risk_category = cut(
-                     feeder_risk_values,
-                     breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1),
-                     labels = c("Very Low", "Low", "Medium", "High", "Very High"),
-                     include.lowest = TRUE
-                  )
-               ) %>%
-                  arrange(desc(risk_value))
-            }
-         })
-
-      }, error = function(e) {
-         # Store error message
-         sim_results$error_message <- paste("Error during simulation:", e$message)
-         # Display error message
-         showNotification(sim_results$error_message, type = "error", duration = NULL)
       })
 
-      # Re-enable run button
-      enable("run_simulation")
    })
 
    # Landscape plot
