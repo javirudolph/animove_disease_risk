@@ -172,15 +172,21 @@ ui <- dashboardPage(
          tabItem(tabName = "risk",
                  fluidRow(
                     box(
-                       title = "Disease Risk Map", width = 8, status = "warning",
+                       title = "Disease Risk Map", width = 6, status = "warning",
                        withSpinner(plotOutput("risk_plot", height = "600px")),
                        downloadButton("download_risk", "Download Plot")
                     ),
                     box(
                        title = "Risk Metrics", width = 4, status = "danger",
                        withSpinner(plotOutput("risk_histogram", height = "300px")),
-                       withSpinner(tableOutput("feeder_risk_table")),
                        downloadButton("download_risk_metrics", "Download Risk Metrics")
+                    )
+                 ),
+                 fluidRow(
+                    box(
+                       title = "Risk Feeders", width = 10, status = "danger",
+                       withSpinner(tableOutput("feeder_risk_table")),
+                       downloadButton("download_risk_feeder", "Download Feeder Risk Table")
                     )
                  ),
                  fluidRow(
@@ -273,7 +279,7 @@ server <- function(input, output, session) {
             sim_results$midge_sample <- dplyr::slice_sample(sim_results$midge_data, n = input$n_samples)
          } else { # GRTS
             grts_sample <- spsurvey::grts(sim_results$midge_data, input$n_samples)
-            sim_results$midge_sample <- grts_sample$sites_base %>%
+            sim_results$midge_sample <- grts_sample$sites_base |>
                dplyr::select(presence, elevation, water_dist, veg_index, temperature, geometry)
          }
 
@@ -416,26 +422,24 @@ server <- function(input, output, session) {
    })
 
    # Risk map plot (with water bodies and feeders)
-   output$risk_plot <- renderPlot({
-      req(sim_results$risk_map, sim_results$water_bodies, sim_results$feeders)
+   risk_plot <- reactive({
+      req(sim_results$risk_map)
 
-      # Get raster as a data frame for ggplot
-      risk_df <- as.data.frame(sim_results$risk_map, xy = TRUE)
-      colnames(risk_df)[3] <- "value"
-
-      ggplot(risk_df, aes(x = x, y = y, fill = value)) +
-         geom_raster() +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue", inherit.aes = FALSE) +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3, inherit.aes = FALSE) +
-         scale_fill_gradientn(colors = colorRampPalette(c("blue", "green", "yellow", "orange", "red"))(100),
-                              limits = c(0, 1),
-                              breaks = seq(0, 1, by = 0.2),
-                              labels = c("Very Low", "Low", "Medium", "High", "Very High")) +
-         labs(title = "Disease Risk Map",
-              subtitle = "Combined risk from animal utilization and midge distribution",
-              fill = "Risk Level") +
+      ggplot() +
+         geom_spatraster(data = sim_results$risk_map) +
+         scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100),
+                              name = "Density") +
+         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
+         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
+         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
          theme_minimal() +
-         theme(legend.position = "right")
+         labs(title = "Normalized Disease Risk Map",
+              subtitle = "Animal Use × Midge Probability")
+   })
+
+   # Render the plot
+   output$risk_plot <- renderPlot({
+      risk_plot()
    })
 
    # Risk histogram
@@ -464,12 +468,15 @@ server <- function(input, output, session) {
    output$feeder_risk_table <- renderTable({
       req(sim_results$feeder_risk)
 
-      sim_results$feeder_risk %>%
-         mutate(risk_value = round(risk_value, 3)) %>%
-         select(feeder_id, risk_value, risk_category) %>%
+      sim_results$feeder_risk |>
+         dplyr::select(feeder_id, risk_point, risk_mean, risk_max) |>
+         mutate(risk_point = round(risk_point, 3),
+                risk_mean = round(risk_mean, 3),
+                risk_max = round(risk_max, 3)) |>
          rename(`Feeder ID` = feeder_id,
-                `Risk Value` = risk_value,
-                `Risk Category` = risk_category)
+                `Risk Point` = risk_point,
+                `Risk Average` = risk_mean,
+                `Risk Max` = risk_max)
    })
 
    # Download handlers for plots
@@ -636,12 +643,15 @@ server <- function(input, output, session) {
       },
       content = function(file) {
          # Create a data.frame with risk metrics
-         feeder_risk_data <- sim_results$feeder_risk %>%
-            mutate(risk_value = round(risk_value, 3)) %>%
-            select(feeder_id, risk_value, risk_category) %>%
+         feeder_risk_data <- sim_results$feeder_risk |>
+            dplyr::select(feeder_id, risk_point, risk_mean, risk_max) |>
+         mutate(risk_point = round(risk_point, 3),
+                risk_mean = round(risk_mean, 3),
+                risk_max = round(risk_max, 3)) |>
             rename(`Feeder ID` = feeder_id,
-                   `Risk Value` = risk_value,
-                   `Risk Category` = risk_category)
+                   `Risk Point` = risk_point,
+                   `Risk Average` = risk_mean,
+                   `Risk Max` = risk_max)
 
          # Write to CSV
          write.csv(feeder_risk_data, file, row.names = FALSE)
