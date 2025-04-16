@@ -409,22 +409,31 @@ server <- function(input, output, session) {
    })
 
    # Animal utilization distribution plot
-   output$ud_plot <- renderPlot({
+   ud_plot <- reactive({
       req(sim_results$animal_ud)
 
-      # Get raster as a data frame for ggplot
-      ud_df <- as.data.frame(sim_results$animal_ud, xy = TRUE)
-      colnames(ud_df)[3] <- "value"
-
-      ggplot(ud_df, aes(x = x, y = y, fill = value)) +
-         geom_raster() +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue", inherit.aes = FALSE) +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3, inherit.aes = FALSE) +
-         scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100)) +
-         labs(title = "Animal Utilization Distribution",
-              subtitle = "Probability of animal presence",
-              fill = "Probability") +
+      ggplot() +
+         # Add the raster layer with geom_spatraster from tidyterra
+         geom_spatraster(data = sim_results$animal_ud) +
+         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
+         geom_sf(data = sim_results$water_bodies, color ="#81C3D7", fill ="#81C3D7") +
+         # Add labels for feeder IDs
+         geom_sf_label(data = sim_results$feeders,
+                       aes(label = id),
+                       color = "white",
+                       fill = "#D95F02",
+                       size = 3,
+                       fontface = "bold")
+         scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100),
+                              name = "Density") +
+         labs(title = "Animal Utilization Distribution") +
          theme_minimal()
+
+   })
+
+   # Render the plot
+   output$ud_plot <- renderPlot({
+      ud_plot()
    })
 
    # Midge sample points plot
