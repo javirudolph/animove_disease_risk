@@ -38,21 +38,6 @@ ggplot() +
 
 # Testing visual for shiny:
 ggplot() +
-   geom_sf(data = study_area, fill = "white", color = "black") +
-   geom_sf(data = water_bodies, fill = "lightblue", color = "blue") +
-   # geom_sf(data = feeders, fill = "red", color = "red", size = 3) +
-   # Add labels for feeder IDs
-   geom_sf_label(data = feeders,
-                aes(label = id),
-                color = "white",
-                fill = "red",
-                size = 2,
-                fontface = "bold") +
-   labs(title = "Simulated Landscape",
-        subtitle = "Study area with water bodies and feeders") +
-   theme_minimal()
-
-ggplot() +
    geom_sf(data = study_area, fill = NA, color = "black") +
    geom_sf(data = water_bodies, aes(fill = "Water Bodies", color = "Water Bodies")) +
    geom_sf(data = feeders, aes(fill = "Feeders", color = "Feeders")) +
@@ -60,16 +45,16 @@ ggplot() +
    geom_sf_label(data = feeders,
                  aes(label = id),
                  color = "white",
-                 fill = "red",
-                 size = 2,
+                 fill = "#D95F02",
+                 size = 3,
                  fontface = "bold") +
    # Set manual color and fill scales
    scale_fill_manual(name = "Features",
-                     values = c("Water Bodies" = "lightblue",
-                                "Feeders" = "red")) +
+                     values = c("Water Bodies" ="#81C3D7",
+                                "Feeders" = "#D95F02")) +
    scale_color_manual(name = "Features",
-                      values = c("Water Bodies" = "blue",
-                                 "Feeders" = "red")) +
+                      values = c("Water Bodies" = "#81C3D7",
+                                 "Feeders" = "#D95F02")) +
    labs(title = "Simulated Landscape",
         subtitle = "Study area with water bodies and feeders") +
    theme_minimal() +
@@ -79,6 +64,34 @@ ggplot() +
 # Create the environmental layers
 env_rasters <- create_env_rasters(study_area, water_bodies)
 plot(env_rasters)
+
+plot_raster <- function(raster_name, title) {
+   selected_raster <- env_rasters[[raster_name]]
+
+   ggplot() +
+      geom_spatraster(data = selected_raster) +
+      scale_fill_gradient(low = "lightgrey", high = "darkblue", na.value = "transparent") +
+      # scale_fill_grey(start = 0.9, end = 0.1, na.value = "transparent") +
+      labs(title = title, fill = "") +
+      theme_minimal() +
+      theme(legend.position = "bottom",
+            plot.title = element_text(size = 12, face = "bold"),
+            axis.title = element_blank())
+}
+
+# Create the four plots
+p1 <- plot_raster("elevation", "Elevation (m)")
+p2 <- plot_raster("water_dist", "Distance to Water (m)")
+p3 <- plot_raster("veg_index", "Vegetation Index")
+p4 <- plot_raster("temperature", "Temperature (°C)")
+
+# Arrange the plots in a 2x2 grid
+cowplot::plot_grid(p1, p2, p3, p4, ncol = 2)
+
+
+
+# Make rasters in ggplot and with greyscale
+
 
 
 # Simulate animal movement

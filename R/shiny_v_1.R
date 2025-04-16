@@ -357,7 +357,8 @@ server <- function(input, output, session) {
 
          ggplot() +
             geom_spatraster(data = selected_raster) +
-            scale_fill_grey(start = 0.9, end = 0.1, na.value = "transparent") +
+            # scale_fill_gradient(low = "lightgrey", high = "darkblue", na.value = "transparent") +
+            scale_fill_viridis_c() +
             labs(title = title, fill = "") +
             theme_minimal() +
             theme(legend.position = "bottom",
@@ -523,13 +524,13 @@ server <- function(input, output, session) {
       }
    )
 
-   output$download_env_plots <- downloadHandler(
+   output$download_all_env <- downloadHandler(
       filename = function() {
          paste("environmental-plots-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
          # Save the plot to a PNG file
-         ggsave(file, plot = env_plots(), width = 10, height = 8, dpi = 300)
+         ggsave(file, plot = env_plots(), width = 10, height = 8, dpi = 300, bg = "white")
       }
    )
 
