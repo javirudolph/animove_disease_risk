@@ -682,7 +682,6 @@ fit_midge_sdm <- function(midge_data, env_rasters) {
 
 create_risk_map <- function(animal_ud, midge_sdm_prediction, normalize = TRUE) {
 
-   midge_sdm_prediction <- midge_sdm$prediction
    # Ensure rasters are aligned
    if (crs(animal_ud) != crs(midge_sdm_prediction) ||
        ext(animal_ud) != ext(midge_sdm_prediction) ||
