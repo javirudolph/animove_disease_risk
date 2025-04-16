@@ -319,19 +319,27 @@ server <- function(input, output, session) {
       req(sim_results$study_area, sim_results$water_bodies, sim_results$feeders)
 
       ggplot() +
-         geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
+         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
+         geom_sf(data = sim_results$water_bodies, aes(fill = "Water Bodies", color = "Water Bodies")) +
+         geom_sf(data = sim_results$feeders, aes(fill = "Feeders", color = "Feeders")) +
          # Add labels for feeder IDs
-         geom_sf_text(data = sim_results$feeders,
-                      aes(label = id),
-                      color = "black",
-                      size = 3.5,
-                      fontface = "bold",
-                      nudge_y = 0.002) +
+         geom_sf_label(data = sim_results$feeders,
+                       aes(label = id),
+                       color = "white",
+                       fill = "#D95F02",
+                       size = 3,
+                       fontface = "bold") +
+         # Set manual color and fill scales
+         scale_fill_manual(name = "Features",
+                           values = c("Water Bodies" ="#81C3D7",
+                                      "Feeders" = "#D95F02")) +
+         scale_color_manual(name = "Features",
+                            values = c("Water Bodies" = "#81C3D7",
+                                       "Feeders" = "#D95F02")) +
          labs(title = "Simulated Landscape",
               subtitle = "Study area with water bodies and feeders") +
-         theme_minimal()
+         theme_minimal() +
+         theme(axis.title = element_blank())
    })
 
    # Use the reactive for display
@@ -340,21 +348,16 @@ server <- function(input, output, session) {
    })
 
    # All environmental rasters plot (2x2 grid)
-   output$all_env_plots <- renderPlot({
+   env_plots <- reactive({
       req(sim_results$env_rasters)
 
-      # Function to create a raster plot with specific title and colors
-      plot_raster <- function(raster_name, title, color_palette) {
+      # Function to create a raster plot with specific title using tidyterra
+      plot_raster <- function(raster_name, title) {
          selected_raster <- sim_results$env_rasters[[raster_name]]
 
-         # Get raster as a data frame for ggplot
-         raster_df <- as.data.frame(selected_raster, xy = TRUE)
-         colnames(raster_df)[3] <- "value"
-
-         # Create the plot
-         ggplot(raster_df, aes(x = x, y = y, fill = value)) +
-            geom_raster() +
-            scale_fill_gradientn(colors = color_palette) +
+         ggplot() +
+            geom_spatraster(data = selected_raster) +
+            scale_fill_grey(start = 0.9, end = 0.1, na.value = "transparent") +
             labs(title = title, fill = "") +
             theme_minimal() +
             theme(legend.position = "bottom",
@@ -363,14 +366,20 @@ server <- function(input, output, session) {
       }
 
       # Create the four plots
-      p1 <- plot_raster("elevation", "Elevation (m)", terrain.colors(100))
-      p2 <- plot_raster("water_dist", "Distance to Water (m)", colorRampPalette(c("darkblue", "lightblue", "white"))(100))
-      p3 <- plot_raster("veg_index", "Vegetation Index", colorRampPalette(c("brown", "yellow", "darkgreen"))(100))
-      p4 <- plot_raster("temperature", "Temperature (°C)", colorRampPalette(c("blue", "yellow", "red"))(100))
+      p1 <- plot_raster("elevation", "Elevation (m)")
+      p2 <- plot_raster("water_dist", "Distance to Water (m)")
+      p3 <- plot_raster("veg_index", "Vegetation Index")
+      p4 <- plot_raster("temperature", "Temperature (°C)")
 
       # Arrange the plots in a 2x2 grid
       cowplot::plot_grid(p1, p2, p3, p4, ncol = 2)
    })
+
+   # Render env plots
+   output$all_env_plots <- renderPlot({
+      env_plots()
+   })
+
 
    # Animal movement plot
    output$movement_plot <- renderPlot({
@@ -514,34 +523,13 @@ server <- function(input, output, session) {
       }
    )
 
-   output$download_all_env <- downloadHandler(
+   output$download_env_plots <- downloadHandler(
       filename = function() {
-         paste("environmental-layers-", Sys.Date(), ".png", sep = "")
+         paste("environmental-plots-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         # Recreate the plot and save it
-         plot_raster <- function(raster_name, title, color_palette) {
-            selected_raster <- sim_results$env_rasters[[raster_name]]
-            raster_df <- as.data.frame(selected_raster, xy = TRUE)
-            colnames(raster_df)[3] <- "value"
-
-            ggplot(raster_df, aes(x = x, y = y, fill = value)) +
-               geom_raster() +
-               scale_fill_gradientn(colors = color_palette) +
-               labs(title = title, fill = "") +
-               theme_minimal() +
-               theme(legend.position = "bottom",
-                     plot.title = element_text(size = 12, face = "bold"),
-                     axis.title = element_blank())
-         }
-
-         p1 <- plot_raster("elevation", "Elevation (m)", terrain.colors(100))
-         p2 <- plot_raster("water_dist", "Distance to Water (m)", colorRampPalette(c("darkblue", "lightblue", "white"))(100))
-         p3 <- plot_raster("veg_index", "Vegetation Index", colorRampPalette(c("brown", "yellow", "darkgreen"))(100))
-         p4 <- plot_raster("temperature", "Temperature (°C)", colorRampPalette(c("blue", "yellow", "red"))(100))
-
-         combined_plot <- grid.arrange(p1, p2, p3, p4, ncol = 2)
-         ggsave(file, plot = combined_plot, width = 12, height = 10, dpi = 300)
+         # Save the plot to a PNG file
+         ggsave(file, plot = env_plots(), width = 10, height = 8, dpi = 300)
       }
    )
 
