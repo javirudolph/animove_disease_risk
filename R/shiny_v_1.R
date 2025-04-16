@@ -41,10 +41,16 @@ ui <- dashboardPage(
                  fluidRow(
                     box(
                        title = "Landscape Parameters", width = 6, status = "primary",
+                       sliderInput("study_area_width", "Study Area Width (m):",
+                                   min = 500, max = 2000, value = 1000, step = 100),
+                       sliderInput("study_area_height", "Study Area Height (m):",
+                                   min = 500, max = 2000, value = 1000, step = 100),
                        sliderInput("water_bodies", "Number of Water Bodies:",
-                                   min = 1, max = 8, value = 4, step = 1),
+                                   min = 1, max = 10, value = 4, step = 1),
                        sliderInput("n_feeders", "Number of Feeders:",
-                                   min = 5, max = 15, value = 10, step = 1)
+                                   min = 5, max = 20, value = 10, step = 1),
+                       sliderInput("buffer_feeders", "Min Distance Between Feeders (m):",
+                                   min = 10, max = 200, value = 50, step = 10)
                     ),
                     box(
                        title = "Animal Movement Parameters", width = 6, status = "primary",
