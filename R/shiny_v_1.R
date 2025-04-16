@@ -16,6 +16,7 @@ library(dplyr)
 library(spsurvey)
 library(shinyjs)
 library(shinycssloaders)
+library(cowplot)
 
 # Source the simulation functions
 source("R/simulation_functions.R")
@@ -342,7 +343,7 @@ server <- function(input, output, session) {
       p4 <- plot_raster("temperature", "Temperature (°C)", colorRampPalette(c("blue", "yellow", "red"))(100))
 
       # Arrange the plots in a 2x2 grid
-      grid.arrange(p1, p2, p3, p4, ncol = 2)
+      cowplot::plot_grid(p1, p2, p3, p4, ncol = 2)
    })
 
    # Animal movement plot
