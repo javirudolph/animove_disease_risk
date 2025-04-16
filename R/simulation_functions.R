@@ -611,11 +611,6 @@ simulate_midge_data <- function(env_rasters, n_samples = 500) {
    return(list(midge_data = midge_data, true_prob = prob_presence))
 }
 
-# Helper function to scale values to 0-1
-scale01 <- function(x) {
-   return((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))
-}
-
 # Fit a species distribution model for midges
 fit_midge_sdm <- function(midge_data, env_rasters) {
    # Fit a logistic regression model
@@ -678,5 +673,11 @@ create_risk_map <- function(animal_ud, midge_sdm_prediction, normalize = TRUE) {
    }
 
    return(risk_map)
+}
+
+## Accessory functions
+# Helper function to scale values to 0-1
+scale01 <- function(x) {
+   return((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))
 }
 
