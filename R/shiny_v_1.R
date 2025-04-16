@@ -66,10 +66,18 @@ ui <- dashboardPage(
                  ),
                  fluidRow(
                     box(
-                       width = 12, status = "success",
+                       title = "Midge Sampling Parameters", width = 6, status = "primary",
+                       radioButtons("sampling_method", "Sampling Method:",
+                                    choices = c("Random" = "random", "GRTS" = "grts"),
+                                    selected = "grts"),
+                       sliderInput("n_samples", "Number of Midge Sampling Points:",
+                                   min = 20, max = 200, value = 100, step = 10)
+                    ),
+                    box(
+                       width = 6, status = "success",
                        actionButton("run_simulation", "Run Simulation",
                                     icon = icon("play"),
-                                    style = "color: #fff; background-color: #28a745; border-color: #28a745; width: 100%; height: 60px; font-size: 24px")
+                                    style = "color: #fff; background-color: #28a745; border-color: #28a745; width: 100%; height: 60px; font-size: 18px")
                     )
                  ),
                  fluidRow(
