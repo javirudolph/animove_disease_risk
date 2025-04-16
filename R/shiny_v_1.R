@@ -115,7 +115,7 @@ ui <- dashboardPage(
                          <li><strong>Elevation:</strong> Simulated terrain elevation across the study area.</li>
                          <li><strong>Water Distance:</strong> Distance from each point to the nearest water body.</li>
                          <li><strong>Vegetation Index:</strong> Simulated vegetation density (similar to NDVI).</li>
-                         <li><strong>Temperature:</strong> Simulated temperature patterns across the landscape (higher values in red, lower in blue).</li>
+                         <li><strong>Temperature:</strong> Simulated temperature patterns across the landscape.</li>
                        </ul>")
                     )
                  )
@@ -138,9 +138,8 @@ ui <- dashboardPage(
                  fluidRow(
                     box(
                        title = "Animal Data Interpretation", width = 12, status = "info",
-                       HTML("<p>The left plot shows the movement tracks of individual animals in the simulation. Each color represents a different animal.</p>
-                       <p>The right plot displays the animal utilization distribution, which shows the probability of finding animals in different areas of the landscape.
-                          Warmer colors (red, orange) indicate areas with higher animal activity.</p>")
+                       HTML("<p>The left plot shows the locations of individual animals in the simulation. Each color represents a different animal.</p>
+                       <p>The right plot displays the animal utilization distribution, which shows the probability of finding animals in different areas of the landscape. Areas with higher values indicate higher animal activity.</p>")
                     )
                  )
          ),
@@ -163,8 +162,7 @@ ui <- dashboardPage(
                     box(
                        title = "Midge Data Interpretation", width = 12, status = "info",
                        HTML("<p>The left plot shows the midge sampling points used to build the distribution model. Points are colored by presence (1) or absence (0) of midges.</p>
-                       <p>The right plot displays the predicted probability of midge presence across the landscape based on environmental variables.
-                          Blues indicate higher probability of midge presence.</p>")
+                       <p>The right plot displays the predicted probability of midge presence across the landscape based on environmental variables.</p>")
                     )
                  )
          ),
@@ -188,7 +186,7 @@ ui <- dashboardPage(
                     box(
                        title = "Risk Interpretation", width = 12, status = "info",
                        HTML("<p>The disease risk map combines animal utilization distribution and midge distribution to identify areas of potential disease transmission.</p>
-                       <p>Areas with both high animal activity and high midge presence represent higher risk for disease transmission (shown in red).</p>
+                       <p>Areas with both high animal activity and high midge presence represent higher risk for disease transmission.</p>
                        <p>The risk histogram shows the distribution of risk values across the landscape, while the table ranks feeders by their associated risk level.</p>
                        <p>This information can be used to target surveillance and control efforts in high-risk areas.</p>")
                     )
@@ -198,7 +196,7 @@ ui <- dashboardPage(
    )
 )
 
-shinyApp(ui, function(...){})
+# shinyApp(ui, function(...){})
 
 # Server
 server <- function(input, output, session) {
