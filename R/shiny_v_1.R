@@ -186,7 +186,7 @@ ui <- dashboardPage(
                     box(
                        title = "Risk Feeders", width = 10, status = "danger",
                        withSpinner(tableOutput("feeder_risk_table")),
-                       downloadButton("download_risk_feeder", "Download Feeder Risk Table")
+                       downloadButton("download_feeder_risk", "Download Feeder Risk Table")
                     )
                  ),
                  fluidRow(
@@ -306,17 +306,30 @@ server <- function(input, output, session) {
 
    })
 
-   # Landscape plot
-   output$landscape_plot <- renderPlot({
+
+   # Lanscape plot
+   landscape_plot <- reactive({
       req(sim_results$study_area, sim_results$water_bodies, sim_results$feeders)
 
       ggplot() +
          geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
          geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
          geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
+         # Add labels for feeder IDs
+         geom_sf_text(data = sim_results$feeders,
+                      aes(label = id),
+                      color = "black",
+                      size = 3.5,
+                      fontface = "bold",
+                      nudge_y = 0.002) +
          labs(title = "Simulated Landscape",
-              subtitle = paste(input$water_bodies, "water bodies and", input$n_feeders, "feeders")) +
+              subtitle = "Study area with water bodies and feeders") +
          theme_minimal()
+   })
+
+   # Use the reactive for display
+   output$landscape_plot <- renderPlot({
+      landscape_plot()
    })
 
    # All environmental rasters plot (2x2 grid)
@@ -464,10 +477,9 @@ server <- function(input, output, session) {
          theme(legend.position = "none")
    })
 
-   # Feeder risk table
-   output$feeder_risk_table <- renderTable({
+   # Feeder Risk Table
+   feeder_risk_data <- reactive({
       req(sim_results$feeder_risk)
-
       sim_results$feeder_risk |>
          dplyr::select(feeder_id, risk_point, risk_mean, risk_max) |>
          mutate(risk_point = round(risk_point, 3),
@@ -479,21 +491,19 @@ server <- function(input, output, session) {
                 `Risk Max` = risk_max)
    })
 
+   # Use the reactive data for the table output
+   output$feeder_risk_table <- renderTable({
+      feeder_risk_data()
+   })
+
    # Download handlers for plots
+   # Landscape
    output$download_landscape <- downloadHandler(
       filename = function() {
          paste("landscape-plot-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = {
-            ggplot() +
-               geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
-               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-               geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
-               labs(title = "Simulated Landscape",
-                    subtitle = paste(input$water_bodies, "water bodies and", input$n_feeders, "feeders")) +
-               theme_minimal()
-         }, width = 10, height = 8, dpi = 300)
+         ggsave(file, plot = landscape_plot(), width = 10, height = 8, dpi = 300, bg = "white")
       }
    )
 
@@ -637,24 +647,12 @@ server <- function(input, output, session) {
       }
    )
 
-   output$download_risk_metrics <- downloadHandler(
+   output$download_feeder_risk <- downloadHandler(
       filename = function() {
-         paste("risk-metrics-", Sys.Date(), ".csv", sep = "")
+         paste("feeder-risk-", Sys.Date(), ".csv", sep = "")
       },
       content = function(file) {
-         # Create a data.frame with risk metrics
-         feeder_risk_data <- sim_results$feeder_risk |>
-            dplyr::select(feeder_id, risk_point, risk_mean, risk_max) |>
-         mutate(risk_point = round(risk_point, 3),
-                risk_mean = round(risk_mean, 3),
-                risk_max = round(risk_max, 3)) |>
-            rename(`Feeder ID` = feeder_id,
-                   `Risk Point` = risk_point,
-                   `Risk Average` = risk_mean,
-                   `Risk Max` = risk_max)
-
-         # Write to CSV
-         write.csv(feeder_risk_data, file, row.names = FALSE)
+         write.csv(feeder_risk_data(), file, row.names = FALSE)
       }
    )
 }
