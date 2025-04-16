@@ -201,3 +201,111 @@ create_animal_ud <- function(animal_tracks, env_rasters) {
 
    return(ud_rast)
 }
+
+simulate_midge_data <- function(env_rasters, n_samples = 500) {
+   # Create random sampling points throughout the study area
+   r_template <- env_rasters[[1]]
+   random_cells <- sample(1:ncell(r_template), n_samples)
+   xy <- xyFromCell(r_template, random_cells)
+
+   # Extract environmental values
+   env_values <- extract(env_rasters, xy)
+
+   # Define relationship between environmental variables and midge presence
+   # Water proximity increases probability
+   # Vegetation has moderate positive effect
+   # Elevation has negative effect (midges prefer lower areas)
+
+   # Normalize environmental variables to 0-1 scale for easier coefficient interpretation
+   env_values$elevation <- scale01(env_values$elevation)
+   env_values$water_dist <- scale01(env_values$water_dist)
+   env_values$temperature <- scale01(env_values$temperature)
+
+   # Inverse of water distance (proximity)
+   env_values$water_prox <- 1 - env_values$water_dist
+
+   # Calculate linear predictor
+   linear_pred <- -1 +
+      3 * env_values$water_prox + # Strong positive effect of water proximity
+      0.5 * env_values$veg_index + # Moderate positive effect of vegetation
+      -2 * env_values$elevation + # Negative effect of elevation
+      -3 * env_values$temperature # Strong negative effect of temperature
+
+   # Add some random noise
+   linear_pred <- linear_pred + rnorm(n_samples, 0, 0.2)
+
+   # Convert to probability using logistic function
+   prob_presence <- 1 / (1 + exp(-linear_pred))
+
+   # Generate presence/absence data
+   presence <- rbinom(n_samples, 1, prob_presence)
+
+   # Create sf object with the data
+   midge_data <- st_sf(
+      presence = presence,
+      elevation = env_values$elevation,
+      water_dist = env_values$water_dist,
+      veg_index = env_values$veg_index,
+      temperature = env_values$temperature,
+      geometry = st_sfc(
+         lapply(1:nrow(xy), function(i) st_point(xy[i, ])),
+         crs = crs(r_template)
+      )
+   )
+
+   return(list(midge_data = midge_data, true_prob = prob_presence))
+}
+
+simulate_midge_data <- function(env_rasters, n_samples = 500) {
+   # Create random sampling points throughout the study area
+   r_template <- env_rasters[[1]]
+   random_cells <- sample(1:ncell(r_template), n_samples)
+   xy <- xyFromCell(r_template, random_cells)
+
+   # Extract environmental values
+   env_values <- extract(env_rasters, xy)
+
+   # Define relationship between environmental variables and midge presence
+   # Water proximity increases probability
+   # Vegetation has moderate positive effect
+   # Elevation has negative effect (midges prefer lower areas)
+
+   # Normalize environmental variables to 0-1 scale for easier coefficient interpretation
+   env_values$elevation <- scale01(env_values$elevation)
+   env_values$water_dist <- scale01(env_values$water_dist)
+   env_values$temperature <- scale01(env_values$temperature)
+
+   # Inverse of water distance (proximity)
+   env_values$water_prox <- 1 - env_values$water_dist
+
+   # Calculate linear predictor
+   linear_pred <- -1 +
+      3 * env_values$water_prox + # Strong positive effect of water proximity
+      0.5 * env_values$veg_index + # Moderate positive effect of vegetation
+      -2 * env_values$elevation + # Negative effect of elevation
+      -3 * env_values$temperature # Strong negative effect of temperature
+
+   # Add some random noise
+   linear_pred <- linear_pred + rnorm(n_samples, 0, 0.2)
+
+   # Convert to probability using logistic function
+   prob_presence <- 1 / (1 + exp(-linear_pred))
+
+   # Generate presence/absence data
+   presence <- rbinom(n_samples, 1, prob_presence)
+
+   # Create sf object with the data
+   midge_data <- st_sf(
+      presence = presence,
+      elevation = env_values$elevation,
+      water_dist = env_values$water_dist,
+      veg_index = env_values$veg_index,
+      temperature = env_values$temperature,
+      geometry = st_sfc(
+         lapply(1:nrow(xy), function(i) st_point(xy[i, ])),
+         crs = crs(r_template)
+      )
+   )
+
+   return(list(midge_data = midge_data, true_prob = prob_presence))
+}

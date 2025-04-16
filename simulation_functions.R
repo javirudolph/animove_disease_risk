@@ -501,7 +501,6 @@ create_risk_map <- function(animal_ud, midge_sdm_prediction, normalize = TRUE) {
    return(risk_map)
 }
 
-
 # 5. Run the simulation -----------------
 
 # Create the simulated landscape
@@ -575,7 +574,7 @@ animal_tracks |>
           y = st_coordinates(geometry)[,2]) |>
    ggplot() +
    facet_wrap(~ factor(animal_id)) +
-      geom_path(aes(x = x, y = y, group = factor(animal_id), color = factor(animal_id))) +
+   geom_path(aes(x = x, y = y, group = factor(animal_id), color = factor(animal_id))) +
    theme_minimal() +
    geom_sf(data = feeders) +
    geom_sf(data = water_bodies)

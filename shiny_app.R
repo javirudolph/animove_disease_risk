@@ -88,6 +88,8 @@ ui <- dashboardPage(
    )
 )
 
+# shinyApp(ui, function(...){})
+
 server <- function(input, output, session) {
    # Reactive simulation function
    simulate_scenario <- eventReactive(input$run_simulation, {
@@ -263,3 +265,4 @@ server <- function(input, output, session) {
 
 # Run the application
 shinyApp(ui, server)
+

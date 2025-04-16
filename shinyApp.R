@@ -41,8 +41,10 @@ ui <- dashboardPage(
                                    min = 1, max = 10, value = 4, step = 1),
                        sliderInput("n_feeders", "Number of Feeders:",
                                    min = 5, max = 20, value = 10, step = 1),
-                       sliderInput("buffer_feeders", "Min Distance Between Feeders (m):",
-                                   min = 10, max = 200, value = 50, step = 10)
+                       sliderInput("min_dist_to_water", "Min Distance from Feeders to Water (m):",
+                                   min = 10, max = 200, value = 100, step = 10),
+                       sliderInput("min_dist_between_feeders", "Min Distance Between Feeders (m):",
+                                   min = 10, max = 200, value = 100, step = 10)
                     ),
                     box(
                        title = "Animal Movement Parameters", width = 6, status = "primary",
@@ -69,7 +71,7 @@ ui <- dashboardPage(
                        width = 6, status = "success",
                        actionButton("run_simulation", "Run Simulation",
                                     icon = icon("play"),
-                                    style = "color: #fff; background-color: #28a745; border-color: #28a745; width: 100%; height: 60px; font-size: 18px")
+                                    style = "color: #fff; background-color: #28a745; border-color: #28a745; width: 100%; height: 60px; font-size: 24px")
                     )
                  )
          ),
@@ -118,6 +120,9 @@ ui <- dashboardPage(
    )
 )
 
+# check out the ui first
+shinyApp(ui, function(...){})
+
 # Server
 server <- function(input, output, session) {
 
@@ -142,7 +147,7 @@ server <- function(input, output, session) {
 
          # Step 1: Create study area
          incProgress(0.1, detail = "Creating landscape")
-         sim_results$study_area <- create_study_area(xmax = input$study_area_width, ymax = input$study_area_height)
+         sim_results$study_area <- create_study_area(width = input$study_area_width, height = input$study_area_height)
 
          # Step 2: Create water bodies
          incProgress(0.1, detail = "Adding water bodies")
@@ -154,7 +159,8 @@ server <- function(input, output, session) {
             sim_results$study_area,
             n = input$n_feeders,
             water_bodies = sim_results$water_bodies,
-            buffer_dist = input$buffer_feeders
+            min_dist_to_water = input$min_dist_to_water,
+            min_dist_between = input$min_dist_between_feeders
          )
 
          # Step 4: Create environmental rasters
@@ -182,7 +188,7 @@ server <- function(input, output, session) {
 
          # Step 7: Simulate midge data
          incProgress(0.1, detail = "Simulating midge distribution")
-         midge_sim <- simulate_midge_data(sim_results$env_rasters, sim_results$water_bodies)
+         midge_sim <- simulate_midge_data(sim_results$env_rasters)
          sim_results$midge_data <- midge_sim$midge_data
 
          # Step 8: Get midge samples
@@ -208,9 +214,9 @@ server <- function(input, output, session) {
    })
 
    # Landscape plot
-   # Create a reactive expression for the plot
-   landscape_plot <- reactive({
+   output$landscape_plot <- renderPlot({
       req(sim_results$study_area, sim_results$water_bodies, sim_results$feeders)
+
       ggplot() +
          geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
          geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
@@ -220,91 +226,40 @@ server <- function(input, output, session) {
          theme_minimal()
    })
 
-   # Render the plot
-   output$landscape_plot <- renderPlot({
-      print(landscape_plot())
-   })
-
    # Animal movement plot
-   movement_plot <- reactive({
+   output$movement_plot <- renderPlot({
       req(sim_results$animal_tracks)
 
       ggplot() +
          geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
          geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
          geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
-         geom_sf(data = sim_results$animal_tracks, aes(color = factor(animal_id)), size = 1) +
+         geom_sf(data = sim_results$animal_tracks, aes(color = factor(animal_id)), size = 0.5) +
          labs(title = "Animal Movement Tracks",
               subtitle = paste("Tracks for", input$n_animals, "animals with", input$n_steps, "steps")) +
-         scale_color_viridis_d(name = "Animal ID", option = "H") +
+         scale_color_viridis_d(name = "Animal ID") +
          theme_minimal()
-   })
-
-   # Render the plot
-   output$movement_plot <- renderPlot({
-      movement_plot()
    })
 
    # Animal utilization distribution plot
-   ud_plot <- reactive({
+   output$ud_plot <- renderPlot({
       req(sim_results$animal_ud)
 
-      # Using tidyterra to plot the raster
-      ggplot() +
-         # Add the raster layer with geom_spatraster from tidyterra
-         geom_spatraster(data = sim_results$animal_ud) +
-         scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100),
-                              name = "Density") +
-         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
-         labs(title = "Animal Utilization Distribution") +
-         theme_minimal()
-   })
-
-   # Render the plot
-   output$ud_plot <- renderPlot({
-      ud_plot()
+      plot(sim_results$animal_ud, main = "Animal Utilization Distribution", col = hcl.colors(50, "YlOrRd"))
    })
 
    # Midge distribution plot
-   midge_plot <- reactive({
+   output$midge_plot <- renderPlot({
       req(sim_results$midge_prediction)
 
-      ggplot() +
-         geom_spatraster(data = sim_results$midge_prediction) +
-         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
-         scale_fill_distiller(palette = "BrBG") +
-         theme_minimal() +
-         labs(title = "Predicted Midge Distribution")
-   })
-
-   # Render the plot
-   output$midge_plot <- renderPlot({
-      midge_plot()
+      plot(sim_results$midge_prediction, main = "Predicted Midge Distribution", col = hcl.colors(50, "Blues"))
    })
 
    # Risk map plot
-   risk_plot <- reactive({
+   output$risk_plot <- renderPlot({
       req(sim_results$risk_map)
 
-      ggplot() +
-         geom_spatraster(data = sim_results$risk_map) +
-         scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100),
-                              name = "Density") +
-         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
-         theme_minimal() +
-         labs(title = "Normalized Disease Risk Map",
-              subtitle = "Animal Use × Midge Probability")
-   })
-
-   # Render the plot
-   output$risk_plot <- renderPlot({
-      risk_plot()
+      plot(sim_results$risk_map, main = "Disease Risk Map", col = hcl.colors(50, "Spectral", rev = TRUE))
    })
 
    # Download handlers for plots
@@ -313,7 +268,15 @@ server <- function(input, output, session) {
          paste("landscape-plot-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = landscape_plot(), width = 10, height = 8, dpi = 300, bg = "white")
+         ggsave(file, plot = {
+            ggplot() +
+               geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
+               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
+               geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
+               labs(title = "Simulated Landscape",
+                    subtitle = "Study area with water bodies and feeders") +
+               theme_minimal()
+         }, width = 10, height = 8, dpi = 300)
       }
    )
 
@@ -322,17 +285,28 @@ server <- function(input, output, session) {
          paste("animal-movement-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = movement_plot(), width = 10, height = 8, dpi = 300, , bg = "white")
+         ggsave(file, plot = {
+            ggplot() +
+               geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
+               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
+               geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
+               geom_sf(data = sim_results$animal_tracks, aes(color = factor(animal_id)), size = 0.5) +
+               labs(title = "Animal Movement Tracks",
+                    subtitle = paste("Tracks for", input$n_animals, "animals with", input$n_steps, "steps")) +
+               scale_color_viridis_d(name = "Animal ID") +
+               theme_minimal()
+         }, width = 10, height = 8, dpi = 300)
       }
    )
 
-
    output$download_ud <- downloadHandler(
       filename = function() {
-         paste("utilization-distribution-", Sys.Date(), ".png", sep = "")
+         paste("animal-utilization-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = ud_plot(), width = 10, height = 8, dpi = 300, bg = white)
+         png(file, width = 3000, height = 2400, res = 300)
+         plot(sim_results$animal_ud, main = "Animal Utilization Distribution", col = hcl.colors(50, "YlOrRd"))
+         dev.off()
       }
    )
 
@@ -341,7 +315,9 @@ server <- function(input, output, session) {
          paste("midge-distribution-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = midge_plot(), width = 10, height = 8, dpi = 300, bg = white)
+         png(file, width = 3000, height = 2400, res = 300)
+         plot(sim_results$midge_prediction, main = "Predicted Midge Distribution", col = hcl.colors(50, "Blues"))
+         dev.off()
       }
    )
 
@@ -350,7 +326,9 @@ server <- function(input, output, session) {
          paste("risk-map-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = risk_plot(), width = 10, height = 8, dpi = 300, bg = white)
+         png(file, width = 3000, height = 2400, res = 300)
+         plot(sim_results$risk_map, main = "Disease Risk Map", col = hcl.colors(50, "Spectral", rev = TRUE))
+         dev.off()
       }
    )
 }
