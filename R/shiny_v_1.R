@@ -55,9 +55,13 @@ ui <- dashboardPage(
                     box(
                        title = "Animal Movement Parameters", width = 6, status = "primary",
                        sliderInput("n_animals", "Number of Animals:",
-                                   min = 1, max = 10, value = 5, step = 1),
+                                   min = 1, max = 20, value = 5, step = 1),
                        sliderInput("n_steps", "Number of Movement Steps:",
-                                   min = 50, max = 300, value = 200, step = 50)
+                                   min = 50, max = 500, value = 200, step = 50),
+                       sliderInput("resolution", "UD Resolution (m):",
+                                   min = 5, max = 50, value = 10, step = 5),
+                       sliderInput("smoothing_factor", "UD Smoothing Factor:",
+                                   min = 1, max = 20, value = 9, step = 1)
                     )
                  ),
                  fluidRow(
