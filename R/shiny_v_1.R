@@ -76,6 +76,10 @@ ui <- dashboardPage(
                     ),
                     box(
                        width = 6, status = "success",
+                       # Add the seed input above the action button
+                       numericInput("seed", "Set random seed for reproducibility:",
+                                    value = 123, min = 1),
+                       # Action button remains the same
                        actionButton("run_simulation", "Run Simulation",
                                     icon = icon("play"),
                                     style = "color: #fff; background-color: #28a745; border-color: #28a745; width: 100%; height: 60px; font-size: 18px")
@@ -225,6 +229,9 @@ server <- function(input, output, session) {
 
    # Run simulation when button is clicked
    observeEvent(input$run_simulation, {
+
+      # Set the seed at the beginning of the simulation
+      set.seed(input$seed)
 
       withProgress(message = 'Running simulation...', value = 0, {
 
