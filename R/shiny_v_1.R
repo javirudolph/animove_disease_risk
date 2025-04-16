@@ -47,9 +47,9 @@ ui <- dashboardPage(
                        sliderInput("study_area_height", "Study Area Height (m):",
                                    min = 500, max = 2000, value = 1000, step = 100),
                        sliderInput("water_bodies", "Number of Water Bodies:",
-                                   min = 1, max = 10, value = 4, step = 1),
+                                   min = 1, max = 10, value = 3, step = 1),
                        sliderInput("n_feeders", "Number of Feeders:",
-                                   min = 5, max = 20, value = 10, step = 1),
+                                   min = 1, max = 20, value = 8, step = 1),
                        sliderInput("buffer_feeders", "Min Distance Between Feeders (m):",
                                    min = 10, max = 200, value = 50, step = 10)
                     ),
@@ -383,18 +383,29 @@ server <- function(input, output, session) {
 
 
    # Animal movement plot
-   output$movement_plot <- renderPlot({
+   movement_plot <- reactive({
       req(sim_results$animal_tracks)
 
       ggplot() +
-         geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
-         geom_sf(data = sim_results$animal_tracks, aes(color = factor(animal_id)), size = 0.5) +
+         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
+         geom_sf(data = sim_results$water_bodies, color ="#81C3D7", fill ="#81C3D7") +
+         # Add labels for feeder IDs
+         geom_sf_label(data = sim_results$feeders,
+                       aes(label = id),
+                       color = "white",
+                       fill = "#D95F02",
+                       size = 3,
+                       fontface = "bold") +
+         geom_sf(data = sim_results$animal_tracks, aes(color = factor(animal_id)), size = 1) +
          labs(title = "Animal Movement Tracks",
-              subtitle = paste(input$n_animals, "animals with", input$n_steps, "steps")) +
-         scale_color_viridis_d(name = "Animal ID") +
+              subtitle = paste("Tracks for", input$n_animals, "animals with", input$n_steps, "steps")) +
+         scale_color_viridis_d(name = "Animal ID", option = "H") +
          theme_minimal()
+   })
+
+   # Render the plot
+   output$movement_plot <- renderPlot({
+      movement_plot()
    })
 
    # Animal utilization distribution plot
@@ -539,39 +550,16 @@ server <- function(input, output, session) {
          paste("animal-movement-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = {
-            ggplot() +
-               geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
-               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-               geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
-               geom_sf(data = sim_results$animal_tracks, aes(color = factor(animal_id)), size = 0.5) +
-               labs(title = "Animal Movement Tracks",
-                    subtitle = paste(input$n_animals, "animals with", input$n_steps, "steps")) +
-               scale_color_viridis_d(name = "Animal ID") +
-               theme_minimal()
-         }, width = 10, height = 8, dpi = 300)
+         ggsave(file, plot = movement_plot(), width = 10, height = 8, dpi = 300, , bg = "white")
       }
    )
 
    output$download_ud <- downloadHandler(
       filename = function() {
-         paste("animal-utilization-", Sys.Date(), ".png", sep = "")
+         paste("utilization-distribution-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = {
-            ud_df <- as.data.frame(sim_results$animal_ud, xy = TRUE)
-            colnames(ud_df)[3] <- "value"
-
-            ggplot(ud_df, aes(x = x, y = y, fill = value)) +
-               geom_raster() +
-               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue", inherit.aes = FALSE) +
-               geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3, inherit.aes = FALSE) +
-               scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100)) +
-               labs(title = "Animal Utilization Distribution",
-                    subtitle = "Probability of animal presence",
-                    fill = "Probability") +
-               theme_minimal()
-         }, width = 10, height = 8, dpi = 300)
+         ggsave(file, plot = ud_plot(), width = 10, height = 8, dpi = 300, bg = white)
       }
    )
 
@@ -595,25 +583,12 @@ server <- function(input, output, session) {
       }
    )
 
-   output$download_midge_prediction <- downloadHandler(
+   output$download_midge <- downloadHandler(
       filename = function() {
-         paste("midge-prediction-", Sys.Date(), ".png", sep = "")
+         paste("midge-distribution-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = {
-            midge_df <- as.data.frame(sim_results$midge_prediction, xy = TRUE)
-            colnames(midge_df)[3] <- "value"
-
-            ggplot(midge_df, aes(x = x, y = y, fill = value)) +
-               geom_raster() +
-               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue", inherit.aes = FALSE) +
-               geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3, inherit.aes = FALSE) +
-               scale_fill_gradientn(colors = colorRampPalette(c("white", "lightblue", "blue", "darkblue"))(100)) +
-               labs(title = "Predicted Midge Distribution",
-                    subtitle = "Probability of midge presence",
-                    fill = "Probability") +
-               theme_minimal()
-         }, width = 10, height = 8, dpi = 300)
+         ggsave(file, plot = midge_plot(), width = 10, height = 8, dpi = 300, bg = white)
       }
    )
 
@@ -622,24 +597,7 @@ server <- function(input, output, session) {
          paste("risk-map-", Sys.Date(), ".png", sep = "")
       },
       content = function(file) {
-         ggsave(file, plot = {
-            risk_df <- as.data.frame(sim_results$risk_map, xy = TRUE)
-            colnames(risk_df)[3] <- "value"
-
-            ggplot(risk_df, aes(x = x, y = y, fill = value)) +
-               geom_raster() +
-               geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue", inherit.aes = FALSE) +
-               geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3, inherit.aes = FALSE) +
-               scale_fill_gradientn(colors = colorRampPalette(c("blue", "green", "yellow", "orange", "red"))(100),
-                                    limits = c(0, 1),
-                                    breaks = seq(0, 1, by = 0.2),
-                                    labels = c("Very Low", "Low", "Medium", "High", "Very High")) +
-               labs(title = "Disease Risk Map",
-                    subtitle = "Combined risk from animal utilization and midge distribution",
-                    fill = "Risk Level") +
-               theme_minimal() +
-               theme(legend.position = "right")
-         }, width = 10, height = 8, dpi = 300)
+         ggsave(file, plot = risk_plot(), width = 10, height = 8, dpi = 300, bg = white)
       }
    )
 
