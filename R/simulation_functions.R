@@ -557,20 +557,52 @@ create_animal_ud <- function(
 # 3. Midge distribution simulation -----------------
 
 # Simulate midge presence/absence data based on environmental variables
-simulate_midge_data <- function(env_rasters, n_samples = 500) {
+simulate_midge_data <- function(env_rasters, water_bodies, n_samples = 500) {
    # Create random sampling points throughout the study area
    r_template <- env_rasters[[1]]
-   random_cells <- sample(1:ncell(r_template), n_samples)
+
+   # Generate more points than needed because some will be filtered out
+   n_buffer <- round(n_samples * 1.5)  # Generate 50% more points as buffer
+   random_cells <- sample(1:ncell(r_template), n_buffer)
    xy <- xyFromCell(r_template, random_cells)
 
+   # Convert the xy matrix to a data frame
+   xy_df <- as.data.frame(xy)
+   names(xy_df) <- c("x", "y")
+
+   # Convert to sf object
+   points_sf <- st_as_sf(xy_df,
+                    coords = c("x", "y"),
+                    crs = st_crs(crs(r_template)))
+
+   # Filter out points that fall within water bodies
+   if (st_crs(points_sf) != st_crs(water_bodies)) {
+      points_sf <- st_transform(points_sf, st_crs(water_bodies))
+   }
+
+   intersection <- st_intersects(points_sf, water_bodies)
+   no_intersection <- lengths(intersection) == 0
+   points_outside_water <- points_sf[no_intersection, ]
+
+   # If we have too few points after filtering, generate more
+   if (nrow(points_outside_water) < n_samples) {
+      warning("Not enough points outside water bodies. Regenerating more points...")
+      return(simulate_midge_data(env_rasters, water_bodies, n_samples))
+   }
+
+   # Take only the required number of points
+   points_outside_water <- slice_sample(points_outside_water, n = n_samples)
+
+   # Extract coordinates from sf object
+   xy_filtered <- st_coordinates(points_outside_water)
+
    # Extract environmental values
-   env_values <- extract(env_rasters, xy)
+   env_values <- extract(env_rasters, xy_filtered)
 
    # Define relationship between environmental variables and midge presence
    # Water proximity increases probability
    # Vegetation has moderate positive effect
    # Elevation has negative effect (midges prefer lower areas)
-
    # Normalize environmental variables to 0-1 scale for easier coefficient interpretation
    env_values$elevation <- scale01(env_values$elevation)
    env_values$water_dist <- scale01(env_values$water_dist)
@@ -602,10 +634,7 @@ simulate_midge_data <- function(env_rasters, n_samples = 500) {
       water_dist = env_values$water_dist,
       veg_index = env_values$veg_index,
       temperature = env_values$temperature,
-      geometry = st_sfc(
-         lapply(1:nrow(xy), function(i) st_point(xy[i, ])),
-         crs = crs(r_template)
-      )
+      geometry = points_outside_water$geometry
    )
 
    return(list(midge_data = midge_data, true_prob = prob_presence))
