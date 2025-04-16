@@ -35,6 +35,47 @@ ggplot() +
    geom_sf(data = water_bodies) +
    geom_sf(data = feeders)
 
+
+# Testing visual for shiny:
+ggplot() +
+   geom_sf(data = study_area, fill = "white", color = "black") +
+   geom_sf(data = water_bodies, fill = "lightblue", color = "blue") +
+   # geom_sf(data = feeders, fill = "red", color = "red", size = 3) +
+   # Add labels for feeder IDs
+   geom_sf_label(data = feeders,
+                aes(label = id),
+                color = "white",
+                fill = "red",
+                size = 2,
+                fontface = "bold") +
+   labs(title = "Simulated Landscape",
+        subtitle = "Study area with water bodies and feeders") +
+   theme_minimal()
+
+ggplot() +
+   geom_sf(data = study_area, fill = NA, color = "black") +
+   geom_sf(data = water_bodies, aes(fill = "Water Bodies", color = "Water Bodies")) +
+   geom_sf(data = feeders, aes(fill = "Feeders", color = "Feeders")) +
+   # Add labels for feeder IDs
+   geom_sf_label(data = feeders,
+                 aes(label = id),
+                 color = "white",
+                 fill = "red",
+                 size = 2,
+                 fontface = "bold") +
+   # Set manual color and fill scales
+   scale_fill_manual(name = "Features",
+                     values = c("Water Bodies" = "lightblue",
+                                "Feeders" = "red")) +
+   scale_color_manual(name = "Features",
+                      values = c("Water Bodies" = "blue",
+                                 "Feeders" = "red")) +
+   labs(title = "Simulated Landscape",
+        subtitle = "Study area with water bodies and feeders") +
+   theme_minimal() +
+   theme(axis.title = element_blank())
+
+
 # Create the environmental layers
 env_rasters <- create_env_rasters(study_area, water_bodies)
 plot(env_rasters)
