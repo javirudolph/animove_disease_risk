@@ -211,13 +211,30 @@ server <- function(input, output, session) {
    # Create a reactive expression for the plot
    landscape_plot <- reactive({
       req(sim_results$study_area, sim_results$water_bodies, sim_results$feeders)
+
       ggplot() +
-         geom_sf(data = sim_results$study_area, fill = "white", color = "black") +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
+         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
+         geom_sf(data = sim_results$water_bodies, aes(fill = "Water Bodies", color = "Water Bodies")) +
+         geom_sf(data = sim_results$feeders, aes(fill = "Feeders", color = "Feeders")) +
+         # Add labels for feeder IDs
+         geom_sf_label(data = sim_results$feeders,
+                       aes(label = id),
+                       color = "white",
+                       fill = "#D95F02",
+                       size = 3,
+                       fontface = "bold") +
+         # Set manual color and fill scales
+         scale_fill_manual(name = "Features",
+                           values = c("Water Bodies" ="#81C3D7",
+                                      "Feeders" = "#D95F02")) +
+         scale_color_manual(name = "Features",
+                            values = c("Water Bodies" = "#81C3D7",
+                                       "Feeders" = "#D95F02")) +
          labs(title = "Simulated Landscape",
               subtitle = "Study area with water bodies and feeders") +
-         theme_minimal()
+         theme_minimal() +
+         theme(axis.title = element_blank())
+
    })
 
    # Render the plot
