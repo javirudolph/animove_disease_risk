@@ -19,7 +19,9 @@ library(shinycssloaders)
 library(cowplot)
 
 # Source the simulation functions
-source("R/simulation_functions.R")
+# source("R/simulation_functions.R") # for local use
+# when publishing:
+source("simulation_functions.R")
 
 # UI
 ui <- dashboardPage(
@@ -471,17 +473,23 @@ server <- function(input, output, session) {
          theme_minimal()
    })
 
-   # Risk map plot (with water bodies and feeders)
+   # Risk map plot
    risk_plot <- reactive({
       req(sim_results$risk_map)
 
       ggplot() +
          geom_spatraster(data = sim_results$risk_map) +
+         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
+         geom_sf(data = sim_results$water_bodies, color ="#81C3D7", fill ="#81C3D7", alpha = 0.6) +
+         # Add labels for feeder IDs
+         geom_sf_label(data = sim_results$feeders,
+                       aes(label = id),
+                       color = "white",
+                       fill = "#D95F02",
+                       size = 3,
+                       fontface = "bold")
          scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100),
                               name = "Density") +
-         geom_sf(data = sim_results$study_area, fill = NA, color = "black") +
-         geom_sf(data = sim_results$water_bodies, fill = "lightblue", color = "blue") +
-         geom_sf(data = sim_results$feeders, fill = "orange", color = "red", size = 3) +
          theme_minimal() +
          labs(title = "Normalized Disease Risk Map",
               subtitle = "Animal Use × Midge Probability")
