@@ -487,7 +487,7 @@ server <- function(input, output, session) {
                        color = "white",
                        fill = "#D95F02",
                        size = 3,
-                       fontface = "bold")
+                       fontface = "bold") +
          scale_fill_gradientn(colors = colorRampPalette(c("white", "yellow", "orange", "red"))(100),
                               name = "Density") +
          theme_minimal() +
